@@ -20,6 +20,6 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_name = Column(String, index=True)
+    customer_name = Column(String(50), index=True)
     date_time = Column(DateTime, index=True)
     duration = Column(Time, index=True)
