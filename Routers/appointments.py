@@ -131,13 +131,16 @@ def get_available_dates(attendant_id: int, db: Session = Depends(get_db)):
 
 @router.post("/set-appointment")
 def set_appointments(appointment: AppointmentCreate, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.super_user == 0 and appointment.attendant_id != current_user.id:  # Cambiado de customer_id a user_id
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
     date_time = parse(appointment.date_time)  # Convert the string to a datetime object
 
     if date_time.time() not in AVAILABLE_TIME_SLOTS:
         raise HTTPException(status_code=400, detail="Invalid time slot")
+
+    # Check if there is an existing appointment at the same time with the same attendant
+    existing_appointment = db.query(Appointment).filter(and_(Appointment.date_time == date_time, Appointment.attendant_id == appointment.attendant_id)).first()
+    
+    if existing_appointment is not None:
+        raise HTTPException(status_code=400, detail="The time slot is not available. Please select another time slot or another attendant.")
 
     new_appointment = Appointment(
         customer_name=appointment.customer_name,
@@ -151,6 +154,7 @@ def set_appointments(appointment: AppointmentCreate, current_user: schemas.User 
     db.commit()
     db.refresh(new_appointment)
     return appointment_to_dict(new_appointment)
+
 
 
 #Pedir los appointments ingresando el attendant_id.
