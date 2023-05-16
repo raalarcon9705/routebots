@@ -1,31 +1,18 @@
 from fastapi import FastAPI, HTTPException, Depends, status,APIRouter
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import  Session
 from typing import List
 from datetime import time, timedelta, datetime, date
-from dateutil.parser import parse
 from Database.database import SessionLocal, engine, Base, get_db
-from Schemas.schemas import Attendant, TokenData, AttendantCreate
 from Models.models import Appointment, Attendant
-from jose import jwt, JWTError
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from Token.token_p import SECRET_KEY, ALGORITHM
-from jose import JWTError as PyJWTError
 from fastapi.security import OAuth2PasswordBearer
 from Schemas import schemas
-from Crud.crud import get_user as get_user_by_email
+from Crud.crud import get_user, update_attendant
 from Crud.crud import create_attendant as create_attendant_crud
-from Models import models
-from Crud.crud import get_user
-from Models.models import Attendant 
-from Schemas.schemas import AttendantCreate
-from Routers.appointments import get_current_user
-from Routers.appointments import get_db
-from sqlalchemy.orm import Session
-from Crud.crud import update_attendant
-
-
+from Routers.appointments import get_current_user, get_db
+from Routers.appointments import get_current_superuser
 
 
 
@@ -46,9 +33,6 @@ credentials_exception = HTTPException(
 
 
 router = APIRouter()
-
-
-
 
 
 
@@ -113,6 +97,25 @@ def update_route(
     return db_attendant
 
 
+@router.delete("/attendant/{attendant_id}")
+def delete_attendant_by_id(
+    attendant_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: schemas.User = Depends(get_current_superuser)
+):
+    db_attendant = db.query(Attendant).filter(Attendant.id == attendant_id).first()
+
+    if db_attendant is None:
+        raise HTTPException(status_code=404, detail="Attendant not found")
+
+    try:
+        db.delete(db_attendant)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred while deleting attendant") from e
+
+    return {"message": "Attendant deleted successfully"}
 
 
 
