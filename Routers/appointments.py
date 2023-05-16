@@ -18,6 +18,7 @@ from Crud.crud import get_user as get_user_by_email
 
 
 
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
@@ -52,6 +53,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
+
+def get_current_superuser(current_user: schemas.User = Depends(get_current_user)):
+    if current_user.super_user != 1:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
 
 
 
@@ -101,13 +107,11 @@ def get_available_dates(current_user: schemas.User = Depends(get_current_user), 
 
     return available_dates
 
-@router.get("/scheduled-appointments")
-def get_scheduled_appointments(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    appointments = db.query(Appointment).all()
-    return [appointment_to_dict(appointment) for appointment in appointments]
-
 @router.post("/set-appointment")
 def set_available_dates(appointment: AppointmentCreate, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.super_user == 0 and appointment.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
     date_time = parse(appointment.date_time)  # Convert the string to a datetime object
 
     if date_time.time() not in AVAILABLE_TIME_SLOTS:
@@ -117,18 +121,34 @@ def set_available_dates(appointment: AppointmentCreate, current_user: schemas.Us
         customer_name=appointment.customer_name,
         date_time=date_time,
         duration=parse(appointment.duration).time(),
-            )
+        user_id=current_user.id,  # Assign the ID of the current user to the new appointment
+        attendant_id=appointment.attendant_id,  # Assign the ID of the attendant to the new appointment
+    )
+
     db.add(new_appointment)
     db.commit()
     db.refresh(new_appointment)
     return appointment_to_dict(new_appointment)
 
 
+
+@router.get("/scheduled-appointments")
+def get_scheduled_appointments(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.super_user == 0:
+        appointments = db.query(Appointment).filter(Appointment.customer_id == current_user.id).all()
+    else:
+        appointments = db.query(Appointment).all()
+    return [appointment_to_dict(appointment) for appointment in appointments]
+
 @router.put("/update-appointment")
 def update_appointment(appointment: AppointmentUpdate, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     db_appointment = db.query(Appointment).get(appointment.id)
     if not db_appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
+
+    if current_user.super_user == 0 and db_appointment.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
     date_time = parse(appointment.date_time)  # Convert the string to a datetime object
 
     if date_time.time() not in AVAILABLE_TIME_SLOTS:
@@ -142,3 +162,13 @@ def update_appointment(appointment: AppointmentUpdate, current_user: schemas.Use
 
     return appointment_to_dict(db_appointment)
 
+@router.delete("/delete-appointment/{appointment_id}")
+def delete_appointment(appointment_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_appointment = db.query(Appointment).get(appointment_id)
+    if not db_appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    if current_user.super_user == 0 and db_appointment.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    db.delete

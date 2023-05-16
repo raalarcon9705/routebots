@@ -11,6 +11,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 import Models.models as models
 import Schemas.schemas as schemas
+from Routers.appointments import get_current_user, get_current_superuser
 
 
 
@@ -51,17 +52,18 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
 
 @router.get("/users/", response_model=List[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_superuser)):
     users = get_users(db, skip=skip, limit=limit)
     return users
 
 
 @router.get("/users/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
+def read_user(user_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_superuser)):
     db_user = get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
+
 
 
 @router.post("/users/", response_model=schemas.User)
@@ -70,7 +72,7 @@ def create_user_endpoint(user: schemas.UserCreate, db: Session = Depends(get_db)
 
 
 @router.put("/users/{user_id}", response_model=schemas.User)
-def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_superuser)):
     db_user = get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -78,7 +80,7 @@ def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(ge
 
 
 @router.delete("/users/{user_id}")
-def delete_user_by_id(user_id: int, db: Session = Depends(get_db)):
+def delete_user_by_id(user_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_superuser)):
     db_user = get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")

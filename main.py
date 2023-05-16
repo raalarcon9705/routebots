@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from Routers import user, appointments
+from Routers import attendants, user, appointments
 from fastapi.staticfiles import StaticFiles
  
 
@@ -9,6 +9,7 @@ app = FastAPI()
 
 app.include_router(user.router)
 app.include_router(appointments.router)
+app.include_router(attendants.router)
 
 
 
